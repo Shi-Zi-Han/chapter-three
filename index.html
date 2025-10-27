@@ -1,0 +1,739 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>交互式数据可视化应用</title>
+    <script src="https://unpkg.com/react@17/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@17/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: #333;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        .header {
+            text-align: center;
+            margin-bottom: 40px;
+            color: white;
+        }
+        
+        .header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+        
+        .header p {
+            font-size: 1.2rem;
+            opacity: 0.9;
+        }
+        
+        .controls {
+            background: white;
+            padding: 20px;
+            border-radius: 15px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+            margin-bottom: 30px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            align-items: center;
+            justify-content: space-between;
+        }
+        
+        .filter-section {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            align-items: center;
+        }
+        
+        .filter-group {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+        
+        .filter-group label {
+            font-weight: 600;
+            color: #555;
+        }
+        
+        select, input, button {
+            padding: 10px 15px;
+            border: 2px solid #e1e5e9;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: all 0.3s ease;
+        }
+        
+        select:focus, input:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+        
+        button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s ease;
+        }
+        
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+        }
+        
+        .chart-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(500px, 1fr));
+            gap: 30px;
+            margin-bottom: 30px;
+        }
+        
+        .chart-container {
+            background: white;
+            padding: 25px;
+            border-radius: 15px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .chart-container:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 15px 40px rgba(0,0,0,0.15);
+        }
+        
+        .chart-title {
+            font-size: 1.4rem;
+            margin-bottom: 20px;
+            color: #2c3e50;
+            text-align: center;
+            font-weight: 600;
+        }
+        
+        .chart-wrapper {
+            position: relative;
+            height: 300px;
+            width: 100%;
+        }
+        
+        .chart-tooltip {
+            position: absolute;
+            background: rgba(0,0,0,0.8);
+            color: white;
+            padding: 10px;
+            border-radius: 5px;
+            font-size: 12px;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.3s;
+            z-index: 1000;
+        }
+        
+        .export-section {
+            background: white;
+            padding: 20px;
+            border-radius: 15px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+            text-align: center;
+        }
+        
+        .export-buttons {
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+            flex-wrap: wrap;
+            margin-top: 15px;
+        }
+        
+        .social-buttons {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            margin-top: 15px;
+        }
+        
+        .social-btn {
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 12px;
+            border: none;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .twitter { background: #1da1f2; color: white; }
+        .facebook { background: #3b5998; color: white; }
+        .linkedin { background: #0077b5; color: white; }
+        
+        @media (max-width: 768px) {
+            .chart-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .controls {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            
+            .filter-section {
+                justify-content: center;
+            }
+            
+            .export-buttons {
+                flex-direction: column;
+                align-items: center;
+            }
+        }
+        
+        .loading {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 200px;
+            font-size: 1.2rem;
+            color: #666;
+        }
+        
+        .zoom-controls {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: white;
+            border-radius: 5px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            z-index: 100;
+        }
+        
+        .zoom-btn {
+            padding: 5px 10px;
+            border: none;
+            background: #f8f9fa;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        
+        .zoom-btn:hover {
+            background: #e9ecef;
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        // 数据定义 - 从Jupyter Notebook中提取
+        const movieData = {
+            labels: ["哪吒之魔童降世", "流浪地球", "复仇者联盟4:终局之战", "疯狂的外星人", "飞驰人生", "烈火英雄", "蜘蛛侠:英雄远征", "速度与激情:特别行动", "扫毒2天地对决", "大黄蜂", "惊奇队长", "比悲伤更悲伤的故事", "哥斯拉2:怪兽之王", "阿丽塔:战斗天使", "银河补习班"],
+            values: [48.57, 46.18, 42.05, 21.83, 17.03, 16.70, 14.01, 13.84, 12.85, 11.38, 10.25, 9.46, 9.27, 8.88, 8.64]
+        };
+
+        const alipayData = {
+            labels: ['购物', '人情往来', '餐饮美食', '通信物流', '生活日用', '交通出行', '休闲娱乐', '其他'],
+            values: [800, 100, 1000, 200, 300, 200, 200, 200]
+        };
+
+        const englishScores = {
+            labels: ['高二1班', '高二2班', '高二3班', '高二4班', '高二5班', '高二6班'],
+            men: [90.5, 89.5, 88.7, 88.5, 85.2, 86.6],
+            women: [92.7, 87.0, 90.5, 85.0, 89.5, 89.8],
+            average: 88.5
+        };
+
+        const speedDistanceData = {
+            speed: [10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 110, 120, 130, 140, 150, 160, 170, 180, 190, 200],
+            distance: [0.5, 2.0, 4.4, 7.9, 12.3, 17.7, 24.1, 31.5, 39.9, 49.2, 59.5, 70.8, 83.1, 96.4, 110.7, 126.0, 142.2, 159.4, 177.6, 196.8]
+        };
+
+        // 实例5：阿里巴巴GMV数据
+        const alibabaGMVData = {
+            years: ["FY2013", "FY2014", "FY2015", "FY2016", "FY2017", "FY2018", "FY2019"],
+            values: [10770, 16780, 24440, 30920, 37670, 48200, 57270]
+        };
+
+        // 实例6：果酱面包配料比例
+        const breadIngredientsData = {
+            labels: ['面粉', '全麦粉', '酵母', '苹果酱', '鸡蛋', '黄油', '盐', '白糖'],
+            weights: [250, 150, 4, 250, 50, 30, 4, 20]
+        };
+
+        // 主应用组件
+        function DataVisualizationApp() {
+            const [selectedChart, setSelectedChart] = React.useState('all');
+            const [filterValue, setFilterValue] = React.useState('');
+            const [zoomLevels, setZoomLevels] = React.useState({
+                movie: 1,
+                alipay: 1,
+                english: 1,
+                speed: 1,
+                alibaba: 1,
+                bread: 1
+            });
+            const [tooltip, setTooltip] = React.useState({ visible: false, content: '', x: 0, y: 0 });
+
+            // 图表配置
+            const chartConfigs = {
+                movie: {
+                    type: 'bar',
+                    data: {
+                        labels: movieData.labels,
+                        datasets: [{
+                            label: '票房(亿元)',
+                            data: movieData.values,
+                            backgroundColor: 'rgba(102, 126, 234, 0.8)',
+                            borderColor: 'rgba(102, 126, 234, 1)',
+                            borderWidth: 1
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                title: { display: true, text: '票房(亿元)' }
+                            }
+                        }
+                    }
+                },
+                alipay: {
+                    type: 'pie',
+                    data: {
+                        labels: alipayData.labels,
+                        datasets: [{
+                            data: alipayData.values,
+                            backgroundColor: [
+                                '#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0',
+                                '#9966FF', '#FF9F40', '#FF6384', '#C9CBCF'
+                            ]
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false
+                    }
+                },
+                english: {
+                    type: 'bar',
+                    data: {
+                        labels: englishScores.labels,
+                        datasets: [
+                            {
+                                label: '男生平均成绩',
+                                data: englishScores.men,
+                                backgroundColor: 'rgba(54, 162, 235, 0.8)'
+                            },
+                            {
+                                label: '女生平均成绩',
+                                data: englishScores.women,
+                                backgroundColor: 'rgba(255, 99, 132, 0.8)'
+                            }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        scales: {
+                            y: {
+                                beginAtZero: false,
+                                min: 80,
+                                title: { display: true, text: '分数' }
+                            }
+                        }
+                    }
+                },
+                speed: {
+                    type: 'scatter',
+                    data: {
+                        datasets: [{
+                            label: '速度与制动距离',
+                            data: speedDistanceData.speed.map((speed, index) => ({
+                                x: speed,
+                                y: speedDistanceData.distance[index]
+                            })),
+                            backgroundColor: 'rgba(75, 192, 192, 0.8)',
+                            pointRadius: 6
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        scales: {
+                            x: { title: { display: true, text: '速度(km/h)' } },
+                            y: { title: { display: true, text: '制动距离(m)' } }
+                        }
+                    }
+                },
+                alibaba: {
+                    type: 'bar',
+                    data: {
+                        labels: alibabaGMVData.years,
+                        datasets: [{
+                            label: 'GMV(亿元)',
+                            data: alibabaGMVData.values,
+                            backgroundColor: 'rgba(255, 159, 64, 0.8)',
+                            borderColor: 'rgba(255, 159, 64, 1)',
+                            borderWidth: 1
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                title: { display: true, text: 'GMV(亿元)' }
+                            }
+                        }
+                    }
+                },
+                bread: {
+                    type: 'pie',
+                    data: {
+                        labels: breadIngredientsData.labels,
+                        datasets: [{
+                            data: breadIngredientsData.weights,
+                            backgroundColor: [
+                                '#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0',
+                                '#9966FF', '#FF9F40', '#FF6384', '#C9CBCF'
+                            ]
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false
+                    }
+                }
+            };
+
+            // 过滤数据
+            const filteredData = {
+                movie: {
+                    labels: movieData.labels.filter((label, index) => 
+                        label.includes(filterValue) && movieData.values[index] > 10
+                    ),
+                    values: movieData.values.filter((value, index) => 
+                        movieData.labels[index].includes(filterValue) && value > 10
+                    )
+                }
+            };
+
+            // 导出功能
+            const exportChart = async (chartId, format) => {
+                const canvas = document.getElementById(chartId);
+                if (!canvas) return;
+
+                if (format === 'png') {
+                    const image = canvas.toDataURL('image/png');
+                    const link = document.createElement('a');
+                    link.download = `${chartId}_chart.png`;
+                    link.href = image;
+                    link.click();
+                } else if (format === 'csv') {
+                    let csvContent = '';
+                    switch (chartId) {
+                        case 'movieChart':
+                            csvContent = '电影名称,票房(亿元)\n' + 
+                                movieData.labels.map((label, i) => `"${label}",${movieData.values[i]}`).join('\n');
+                            break;
+                        case 'alipayChart':
+                            csvContent = '消费类型,金额(元)\n' + 
+                                alipayData.labels.map((label, i) => `"${label}",${alipayData.values[i]}`).join('\n');
+                            break;
+                    }
+                    
+                    const blob = new Blob([csvContent], { type: 'text/csv' });
+                    const url = window.URL.createObjectURL(blob);
+                    const link = document.createElement('a');
+                    link.href = url;
+                    link.download = `${chartId}_data.csv`;
+                    link.click();
+                }
+            };
+
+            // 分享功能
+            const shareChart = (platform) => {
+                const text = '查看这个精彩的数据可视化图表！';
+                const url = window.location.href;
+                
+                const shareUrls = {
+                    twitter: `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(url)}`,
+                    facebook: `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}`,
+                    linkedin: `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(url)}`
+                };
+                
+                window.open(shareUrls[platform], '_blank', 'width=600,height=400');
+            };
+
+            // 缩放功能
+            const handleZoom = (chartId, direction) => {
+                setZoomLevels(prev => ({
+                    ...prev,
+                    [chartId]: Math.max(0.5, Math.min(2, prev[chartId] + (direction === 'in' ? 0.1 : -0.1)))
+                }));
+            };
+
+            // 显示工具提示
+            const showTooltip = (content, x, y) => {
+                setTooltip({ visible: true, content, x, y });
+            };
+
+            const hideTooltip = () => {
+                setTooltip({ visible: false, content: '', x: 0, y: 0 });
+            };
+
+            return (
+                <div className="container">
+                    <div className="header">
+                        <h1>📊 交互式数据可视化应用</h1>
+                        <p>基于Jupyter Notebook数据的动态可视化展示</p>
+                    </div>
+
+                    {/* 控制面板 */}
+                    <div className="controls">
+                        <div className="filter-section">
+                            <div className="filter-group">
+                                <label>选择图表类型:</label>
+                                <select value={selectedChart} onChange={(e) => setSelectedChart(e.target.value)}>
+                                    <option value="all">全部图表</option>
+                                    <option value="movie">电影票房排行</option>
+                                    <option value="alipay">支付宝消费分析</option>
+                                    <option value="english">英语成绩对比</option>
+                                    <option value="speed">速度与制动距离</option>
+                                    <option value="alibaba">阿里巴巴GMV数据</option>
+                                    <option value="bread">果酱面包配料</option>
+                                </select>
+                            </div>
+                            
+                            <div className="filter-group">
+                                <label>筛选条件:</label>
+                                <input 
+                                    type="text" 
+                                    placeholder="输入关键词筛选..." 
+                                    value={filterValue}
+                                    onChange={(e) => setFilterValue(e.target.value)}
+                                />
+                            </div>
+                        </div>
+                        
+                        <button onClick={() => {
+                            setFilterValue('');
+                            setSelectedChart('all');
+                            setZoomLevels({ movie: 1, alipay: 1, english: 1, speed: 1, alibaba: 1, bread: 1 });
+                        }}>
+                            重置所有设置
+                        </button>
+                    </div>
+
+                    {/* 图表网格 */}
+                    <div className="chart-grid">
+                        {(selectedChart === 'all' || selectedChart === 'movie') && (
+                            <ChartComponent 
+                                id="movieChart"
+                                title="🎬 2019年内地电影票房排行榜"
+                                config={chartConfigs.movie}
+                                zoom={zoomLevels.movie}
+                                onZoom={(dir) => handleZoom('movie', dir)}
+                                onTooltip={showTooltip}
+                                onTooltipHide={hideTooltip}
+                            />
+                        )}
+                        
+                        {(selectedChart === 'all' || selectedChart === 'alipay') && (
+                            <ChartComponent 
+                                id="alipayChart"
+                                title="💰 支付宝月账单消费分析"
+                                config={chartConfigs.alipay}
+                                zoom={zoomLevels.alipay}
+                                onZoom={(dir) => handleZoom('alipay', dir)}
+                                onTooltip={showTooltip}
+                                onTooltipHide={hideTooltip}
+                            />
+                        )}
+                        
+                        {(selectedChart === 'all' || selectedChart === 'english') && (
+                            <ChartComponent 
+                                id="englishChart"
+                                title="📚 高二年级英语成绩对比"
+                                config={chartConfigs.english}
+                                zoom={zoomLevels.english}
+                                onZoom={(dir) => handleZoom('english', dir)}
+                                onTooltip={showTooltip}
+                                onTooltipHide={hideTooltip}
+                            />
+                        )}
+                        
+                        {(selectedChart === 'all' || selectedChart === 'speed') && (
+                            <ChartComponent 
+                                id="speedChart"
+                                title="🚗 汽车速度与制动距离关系"
+                                config={chartConfigs.speed}
+                                zoom={zoomLevels.speed}
+                                onZoom={(dir) => handleZoom('speed', dir)}
+                                onTooltip={showTooltip}
+                                onTooltipHide={hideTooltip}
+                            />
+                        )}
+                        
+                        {(selectedChart === 'all' || selectedChart === 'alibaba') && (
+                            <ChartComponent 
+                                id="alibabaChart"
+                                title="📈 阿里巴巴GMV数据(2013-2019)"
+                                config={chartConfigs.alibaba}
+                                zoom={zoomLevels.alibaba}
+                                onZoom={(dir) => handleZoom('alibaba', dir)}
+                                onTooltip={showTooltip}
+                                onTooltipHide={hideTooltip}
+                            />
+                        )}
+                        
+                        {(selectedChart === 'all' || selectedChart === 'bread') && (
+                            <ChartComponent 
+                                id="breadChart"
+                                title="🍞 果酱面包配料比例"
+                                config={chartConfigs.bread}
+                                zoom={zoomLevels.bread}
+                                onZoom={(dir) => handleZoom('bread', dir)}
+                                onTooltip={showTooltip}
+                                onTooltipHide={hideTooltip}
+                            />
+                        )}
+                    </div>
+
+                    {/* 导出和分享 */}
+                    <div className="export-section">
+                        <h3>数据导出与分享</h3>
+                        <div className="export-buttons">
+                            <button onClick={() => exportChart('movieChart', 'png')}>导出票房图表(PNG)</button>
+                            <button onClick={() => exportChart('movieChart', 'csv')}>导出票房数据(CSV)</button>
+                            <button onClick={() => exportChart('alipayChart', 'png')}>导出消费图表(PNG)</button>
+                            <button onClick={() => exportChart('alipayChart', 'csv')}>导出消费数据(CSV)</button>
+                            <button onClick={() => exportChart('alibabaChart', 'png')}>导出GMV图表(PNG)</button>
+                            <button onClick={() => exportChart('alibabaChart', 'csv')}>导出GMV数据(CSV)</button>
+                            <button onClick={() => exportChart('breadChart', 'png')}>导出配料图表(PNG)</button>
+                            <button onClick={() => exportChart('breadChart', 'csv')}>导出配料数据(CSV)</button>
+                        </div>
+                        
+                        <div className="social-buttons">
+                            <button className="social-btn twitter" onClick={() => shareChart('twitter')}>Twitter</button>
+                            <button className="social-btn facebook" onClick={() => shareChart('facebook')}>Facebook</button>
+                            <button className="social-btn linkedin" onClick={() => shareChart('linkedin')}>LinkedIn</button>
+                        </div>
+                    </div>
+
+                    {/* 工具提示 */}
+                    {tooltip.visible && (
+                        <div 
+                            className="chart-tooltip"
+                            style={{ 
+                                left: tooltip.x + 10, 
+                                top: tooltip.y + 10,
+                                opacity: tooltip.visible ? 1 : 0 
+                            }}
+                        >
+                            {tooltip.content}
+                        </div>
+                    )}
+                </div>
+            );
+        }
+
+        // 图表组件
+        function ChartComponent({ id, title, config, zoom, onZoom, onTooltip, onTooltipHide }) {
+            const chartRef = React.useRef(null);
+            const chartInstance = React.useRef(null);
+
+            React.useEffect(() => {
+                if (chartRef.current) {
+                    if (chartInstance.current) {
+                        chartInstance.current.destroy();
+                    }
+
+                    const ctx = chartRef.current.getContext('2d');
+                    chartInstance.current = new Chart(ctx, {
+                        ...config,
+                        options: {
+                            ...config.options,
+                            animation: {
+                                duration: 1000,
+                                easing: 'easeOutQuart'
+                            },
+                            onHover: (event, elements) => {
+                                if (elements.length > 0) {
+                                    const element = elements[0];
+                                    const dataset = config.data.datasets[element.datasetIndex];
+                                    const value = dataset.data[element.index];
+                                    const label = config.data.labels[element.index];
+                                    onTooltip(`${label}: ${value}`, event.x, event.y);
+                                } else {
+                                    onTooltipHide();
+                                }
+                            }
+                        }
+                    });
+                }
+
+                return () => {
+                    if (chartInstance.current) {
+                        chartInstance.current.destroy();
+                    }
+                };
+            }, [config, onTooltip, onTooltipHide]);
+
+            React.useEffect(() => {
+                if (chartInstance.current) {
+                    chartInstance.current.resize();
+                }
+            }, [zoom]);
+
+            return (
+                <div className="chart-container">
+                    <div className="zoom-controls">
+                        <button className="zoom-btn" onClick={() => onZoom('in')}>+</button>
+                        <button className="zoom-btn" onClick={() => onZoom('out')}>-</button>
+                    </div>
+                    
+                    <h3 className="chart-title">{title}</h3>
+                    <div className="chart-wrapper">
+                        <canvas 
+                            ref={chartRef} 
+                            id={id}
+                            style={{ 
+                                transform: `scale(${zoom})`,
+                                transformOrigin: 'center center'
+                            }}
+                        />
+                    </div>
+                </div>
+            );
+        }
+
+        // 渲染应用
+        ReactDOM.render(<DataVisualizationApp />, document.getElementById('root'));
+    </script>
+</body>
+</html>
